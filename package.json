@@ -1,0 +1,13 @@
+{
+    "name": "people-api-connector",
+    "description": "Connects to People API & manages contacts",
+    "repository": {
+        "type": "git",
+        "url": "git@github.com:Oaphi/people-api.git"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "jsdoc": "^3.6.3",
+        "mocha": "^7.0.1"
+    }
+}
