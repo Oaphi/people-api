@@ -5,6 +5,10 @@
         "type": "git",
         "url": "git@github.com:Oaphi/people-api.git"
     },
+    "scripts": {
+        "docs": "jsdoc -c specs/docs.js",
+        "test": "mocha"
+    },
     "dependencies": {},
     "devDependencies": {
         "jsdoc": "^3.6.3",

@@ -1,5 +1,7 @@
 module.exports = {
-    "destination": "docs",
+    "opts": {
+        "destination": "docs"
+    },
     "pedantic": true,
     "source": {
         "include": ["src"]
