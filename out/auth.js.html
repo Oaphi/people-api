@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: auth.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: auth.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const { base64urlEncode } = require('./utils.js');
+
+/**
+ * Controls 2-legged OAuth 2.0 flow
+ * @class
+ */
+class Authenticator {
+
+    /**
+     * @param {String} [param] parameter name
+     */
+    constructor(param) {
+        this.param = param || 'people_oauth';
+
+        this.key = null;
+        this.impersonate = null;
+
+        this.urls = Object.freeze({
+            auth: 'https://oauth2.googleapis.com/token'
+        });
+
+        this.scopes = new Set();
+    }
+
+    /**
+     * Gets token from property store
+     * @private
+     * @method
+     */
+    _getTokenFromStore() {
+        return PropertiesService
+            .getScriptProperties()
+            .getProperty(this.param);
+    }
+
+    /**
+     * Gets number of seconds since unix epoch
+     * @returns {Number}
+     */
+    static now() {
+        return Math.floor(Date.now() / 1000);
+    }
+
+    /**
+     * Gets access token
+     * @returns {String}
+     */
+    get token() {
+        const { impersonate, key, scopes, urls } = this;
+
+        const header = {
+            alg: "RS256",
+            typ: "JWT"
+        };
+
+        const issuedAt = Authenticator.now();
+
+        const expiresIn = 3600;
+
+        const expiresAt = issuedAt + expiresIn;
+
+        const payload = {
+            aud: urls.auth,
+            exp: expiresAt,
+            iat: issuedAt,
+            iss: 'contacts-playground@webhook-standalone.iam.gserviceaccount.com',
+            scope: [...scopes.values()]
+        };
+
+        impersonate &amp;&amp; (payload.sub = impersonate);
+
+        const encodedHeader = base64urlEncode(JSON.stringify(header));
+        const encodedPayload = base64urlEncode(JSON.stringify(payload));
+
+        const token = `${encodedHeader}.${encodedPayload}`;
+
+        const privateKey = key;
+
+        const signature = Utilities.computeRsaSha256Signature(token, privateKey);
+
+        const encodedSignature = base64urlEncode(signature);
+
+        const signedToken = `${token}.${encodedSignature}`;
+
+        return signedToken;
+    }
+
+    /**
+     * Gets access token from properties store 
+     * or requests a new one (if no token or expired)
+     * @returns {String}
+     */
+    getToken() {
+        const existing = this._getTokenFromStore();
+
+        const token = existing ?
+            this.isExpired(existing) ?
+                this.issueToken() :
+                existing.split(':')[0] :
+            this.issueToken();
+
+        return token;
+    }
+
+    /**
+     * Checks if access token is expired
+     * @param {String} value 
+     * @returns {Boolean}
+     */
+    isExpired(value) {
+        const [token, expires] = value.split(':');
+
+        const expired = PeopleAPI.now() >= expires;
+
+        return expired;
+    }
+
+    /**
+     * Attempts to issue access token
+     */
+    issueToken() {
+        const { param, token, urls } = this;
+
+        const response = UrlFetchApp.fetch(urls.auth, {
+            method: "post",
+            payload: {
+                grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                assertion: token
+            },
+            muteHttpExceptions: true
+        });
+
+        if (response.getResponseCode() !== 200) {
+            throw new Error(`Could not issue access token`);
+        }
+
+        const content = response.getContentText();
+
+        const { access_token, expires_in } = JSON.parse(content);
+
+        const props = PropertiesService.getScriptProperties();
+
+        const expires = PeopleAPI.now() + expires_in;
+
+        props.setProperty(param, `${access_token}:${expires}`);
+
+        return access_token;
+    }
+
+    /**
+     * For service account OAuth flow,
+     * sets account email on whose behalf 
+     * to act when access token is issued
+     * @param {String} email 
+     * @returns {Authenticator}
+     */
+    setImpersonate(email) {
+        email &amp;&amp; (this.impersonate = email);
+        return this;
+    }
+
+    /**
+     * Revokes access token (removes from store)
+     * Most of access tokens are not revokable
+     */
+    revoke() {
+        const existing = this._getTokenFromStore();
+
+        if (!existing) {
+            return;
+        }
+
+        PropertiesService
+            .getScriptProperties()
+            .deleteProperty(this.param);
+    }
+
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Authenticator.html">Authenticator</a></li><li><a href="PeopleAPI.html">PeopleAPI</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Fri Feb 28 2020 06:15:55 GMT+0300 (Moscow Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
